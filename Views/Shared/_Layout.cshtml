@@ -5,53 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] — NetSentinel</title>
     <link rel="stylesheet" href="~/css/site.css" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="ns-layout">
-        <aside class="sidebar">
-            <div class="logo">NET<span>SENTINEL</span></div>
-            <div class="subnet-label" id="subnetLabel">192.168.1.0/24</div>
-            <div class="status-pill">
-                <div class="pulse" id="statusPulse"></div>
-                <span id="statusText">MONITORING</span>
-            </div>
-            <nav>
-                <div class="nav-section">MONITOR</div>
-                <a href="/" class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "active" : "")">
-                    <span class="nav-icon">◈</span> Dashboard
-                </a>
-                <a href="/devices" class="nav-item">
-                    <span class="nav-icon">⬡</span> Devices
-                </a>
-                <a href="/traffic" class="nav-item">
-                    <span class="nav-icon">≋</span> Traffic
-                </a>
-                <div class="nav-section">SECURITY</div>
-                <a href="/alerts" class="nav-item">
-                    <span class="nav-icon">⚠</span> Alerts
-                    <span class="alert-badge" id="alertBadge" style="display:none">0</span>
-                </a>
-                <a href="/packets" class="nav-item">
-                    <span class="nav-icon">◎</span> Packets
-                </a>
-                <div class="nav-section">DATA</div>
-                <a href="/Home/Logs" class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Logs" ? "active" : "")">
-                    <span class="nav-icon">☰</span> Logs
-                </a>
-            </nav>
-            <button class="scan-btn" id="scanBtn" onclick="triggerScan()">▶ SCAN NETWORK</button>
-        </aside>
-        <main class="main-content">
-            @RenderBody()
-        </main>
-    </div>
-
-    <div id="toastContainer" class="toast-container"></div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
-    <script src="~/js/site.js"></script>
-    @await RenderSectionAsync("Scripts", required: false)
+<div class="ns-layout">
+    <aside class="sidebar">
+        <div class="logo">NET<span>SENTINEL</span></div>
+        <div class="subnet-label" id="subnetLabel">SQL Server 2019</div>
+        <div class="status-pill"><div class="pulse"></div><span>MONITORING</span></div>
+        <nav>
+            <div class="nav-section">MONITOR</div>
+            <a href="/" class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString()=="Index"?"active":"")"><span>◈</span> Dashboard</a>
+            <div class="nav-section">SECURITY</div>
+            <a href="#" class="nav-item"><span>⚠</span> Alerts <span class="alert-badge" id="alertBadge" style="display:none">0</span></a>
+            <div class="nav-section">DATA</div>
+            <a href="/Home/Logs" class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString()=="Logs"?"active":"")"><span>☰</span> Logs</a>
+        </nav>
+        <button class="scan-btn" id="scanBtn" onclick="triggerScan()">▶ SCAN NETWORK</button>
+    </aside>
+    <main class="main-content">@RenderBody()</main>
+</div>
+<div id="toastContainer" class="toast-container"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
+<script src="~/js/site.js"></script>
+@await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

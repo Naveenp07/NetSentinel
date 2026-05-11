@@ -2,51 +2,55 @@ using Microsoft.EntityFrameworkCore;
 using NetSentinel.Data;
 using NetSentinel.Hubs;
 using NetSentinel.Services;
- 
+
 var builder = WebApplication.CreateBuilder(args);
- 
-// JSON must be camelCase so JavaScript fetch calls can read properties
-builder.Services.AddControllersWithViews()
-    .AddJsonOptions(opts =>
-    {
-        opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
-        opts.JsonSerializerOptions.WriteIndented = false;
-    });
- 
-builder.Services.AddSignalR();
- 
-// Database
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? "Data Source=netsentinel.db"));
- 
+
 // Services
+builder.Services.AddControllersWithViews();
+builder.Services.AddSignalR();
+
+// SQL Server 2019
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlOptions =>
+        {
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(10),
+                errorNumbersToAdd: null);
+            sqlOptions.CommandTimeout(30);
+        }));
+
+// App services
 builder.Services.AddScoped<NetworkScannerService>();
 builder.Services.AddScoped<AlertService>();
-// PacketCaptureService holds a long-lived capture device handle, must be Singleton
 builder.Services.AddSingleton<PacketCaptureService>();
- 
+
 var app = builder.Build();
- 
-// Ensure DB exists
+
+// Auto-create DB and apply migrations on startup
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        db.Database.Migrate();
+        logger.LogInformation("SQL Server database ready.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Database migration failed. Check SQL Server connection string.");
+    }
 }
- 
+
 if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
- 
+
 app.UseStaticFiles();
 app.UseRouting();
- 
-// IMPORTANT: MapControllers for API + MapControllerRoute for MVC views
-app.MapControllers();
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
- 
+app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}");
 app.MapHub<NetworkHub>("/networkHub");
- 
+
 app.Run();

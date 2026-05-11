@@ -1,18 +1,11 @@
-## .NET
+## .NET Core
 bin/
 obj/
-*.user
-*.suo
-.vs/
 *.db
 *.db-shm
 *.db-wal
-
-## Rider
-.idea/
-
-## VS Code
+*.user
+.vs/
 .vscode/
-
-## Publish
-publish/
+*.suo
+appsettings.Development.json

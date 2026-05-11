@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NetSentinel.Data;
-using NetSentinel.Models;
 using NetSentinel.Services;
 
 namespace NetSentinel.Controllers
@@ -11,83 +10,40 @@ namespace NetSentinel.Controllers
     public class TrafficController : ControllerBase
     {
         private readonly AppDbContext _db;
-        private readonly PacketCaptureService _captureService;
+        private readonly PacketCaptureService _capture;
+        public TrafficController(AppDbContext db, PacketCaptureService capture) { _db = db; _capture = capture; }
 
-        public TrafficController(AppDbContext db, PacketCaptureService captureService)
-        {
-            _db = db;
-            _captureService = captureService;
-        }
-
-        [HttpGet("stats")]
-        public IActionResult GetStats()
-        {
-            var summary = _captureService.GetTrafficSummary();
-            return Ok(summary);
-        }
-
-        [HttpGet("logs")]
-        public IActionResult GetLiveLogs([FromQuery] int count = 20)
-        {
-            var logs = _captureService.GetLiveLogs(count);
-            return Ok(logs);
-        }
-
-        [HttpGet("interfaces")]
-        public IActionResult GetInterfaces()
-        {
-            return Ok(_captureService.GetAvailableInterfaces());
-        }
+        [HttpGet("stats")]    public IActionResult Stats() => Ok(_capture.GetTrafficSummary());
+        [HttpGet("logs")]     public IActionResult Logs([FromQuery] int count = 20) => Ok(_capture.GetLiveLogs(count));
+        [HttpGet("interfaces")] public IActionResult Interfaces() => Ok(_capture.GetAvailableInterfaces());
 
         [HttpPost("capture/start")]
-        public IActionResult StartCapture([FromQuery] int deviceIndex = 0)
+        public IActionResult Start([FromQuery] int deviceIndex = 0)
         {
-            if (_captureService.IsCapturing)
-                return BadRequest("Capture already running.");
-            var started = _captureService.StartCapture(deviceIndex);
-            return started ? Ok("Capture started.") : StatusCode(500, "Failed to start capture. Check Npcap/libpcap and run as admin.");
+            if (_capture.IsCapturing) return BadRequest("Already capturing.");
+            return _capture.StartCapture(deviceIndex)
+                ? Ok("Capture started.")
+                : StatusCode(500, "Failed. Check Npcap/libpcap and run as Administrator.");
         }
 
         [HttpPost("capture/stop")]
-        public IActionResult StopCapture()
-        {
-            _captureService.StopCapture();
-            return Ok("Capture stopped.");
-        }
+        public IActionResult Stop() { _capture.StopCapture(); return Ok("Stopped."); }
 
         [HttpGet("capture/status")]
-        public IActionResult CaptureStatus()
-        {
-            return Ok(new { IsCapturing = _captureService.IsCapturing });
-        }
+        public IActionResult Status() => Ok(new { _capture.IsCapturing });
 
         [HttpGet("history")]
-        public async Task<IActionResult> GetHistory([FromQuery] int minutes = 10)
-        {
-            var since = DateTime.UtcNow.AddMinutes(-minutes);
-            var records = await _db.TrafficRecords
-                .Where(t => t.Timestamp >= since)
-                .OrderByDescending(t => t.Timestamp)
-                .Take(200)
-                .ToListAsync();
-            return Ok(records);
-        }
+        public async Task<IActionResult> History([FromQuery] int minutes = 10) =>
+            Ok(await _db.TrafficRecords
+                .Where(t => t.Timestamp >= DateTime.UtcNow.AddMinutes(-minutes))
+                .OrderByDescending(t => t.Timestamp).Take(200).ToListAsync());
 
         [HttpGet("by-protocol")]
-        public async Task<IActionResult> GetByProtocol()
-        {
-            var since = DateTime.UtcNow.AddMinutes(-5);
-            var summary = await _db.TrafficRecords
-                .Where(t => t.Timestamp >= since)
+        public async Task<IActionResult> ByProtocol() =>
+            Ok(await _db.TrafficRecords
+                .Where(t => t.Timestamp >= DateTime.UtcNow.AddMinutes(-5))
                 .GroupBy(t => t.Protocol)
-                .Select(g => new
-                {
-                    Protocol = g.Key.ToString(),
-                    TotalBytes = g.Sum(t => t.BytesSent),
-                    PacketCount = g.Count()
-                })
-                .ToListAsync();
-            return Ok(summary);
-        }
+                .Select(g => new { Protocol = g.Key.ToString(), TotalBytes = g.Sum(t => t.BytesSent), Count = g.Count() })
+                .ToListAsync());
     }
 }

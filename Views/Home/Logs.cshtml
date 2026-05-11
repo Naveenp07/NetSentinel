@@ -6,38 +6,30 @@
 
 <div class="page-header">
     <div class="page-title">SYSTEM LOGS</div>
-    <button class="btn-outline" onclick="clearLogs()">CLEAR LOGS</button>
+    <div class="last-scan">@Model.Count entries</div>
 </div>
 
-<div class="panel">
-    <div class="panel-head">LOG ENTRIES <span class="badge badge-info">@Model.Count entries</span></div>
+<div class="panel" style="margin-bottom:0">
+    <div class="panel-head">
+        LOG HISTORY
+        <span class="badge badge-info">Last 200 entries</span>
+    </div>
     <div class="log-table">
-        @foreach (var log in Model)
-        {
-            <div class="log-row">
-                <span class="log-time">@log.Timestamp.ToString("HH:mm:ss")</span>
-                <span class="log-level @(log.Level == "OK" ? "log-ok" : log.Level == "WARN" ? "log-warn" : log.Level == "ERROR" ? "log-danger" : "log-info")"
-                      style="min-width:60px;display:inline-block;">[@log.Level]</span>
-                <span class="log-msg" style="color:#c0d8f0;">@log.Message</span>
-                @if (!string.IsNullOrEmpty(log.Source))
-                {
-                    <span style="color:#2a4a6a;margin-left:auto;font-size:10px;">@log.Source</span>
-                }
-            </div>
-        }
         @if (!Model.Any())
         {
             <div class="empty-state">No log entries yet. Run a scan to generate logs.</div>
         }
+        else
+        {
+            @foreach (var log in Model)
+            {
+                <div class="log-row">
+                    <span class="log-time">@log.Timestamp.ToString("HH:mm:ss")</span>
+                    <span class="log-level log-@log.Level.ToLower()">[@log.Level]</span>
+                    <span class="log-source">@log.Source</span>
+                    <span class="log-msg log-@log.Level.ToLower()">@log.Message</span>
+                </div>
+            }
+        }
     </div>
 </div>
-
-@section Scripts {
-<script>
-async function clearLogs() {
-    if (!confirm('Clear all log entries?')) return;
-    await fetch('/api/logs/clear', { method: 'DELETE' });
-    location.reload();
-}
-</script>
-}
