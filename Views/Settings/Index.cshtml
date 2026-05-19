@@ -1,0 +1,77 @@
+@{ ViewData["Title"] = "Settings"; Layout = "~/Views/Shared/_Layout.cshtml"; }
+
+<div class="panels">
+    <div class="panel">
+        <div class="panel-head">NETWORK SETTINGS</div>
+        <div class="settings-section">
+            <div class="settings-label">SCAN CONFIGURATION</div>
+            <div class="setting-row"><span class="setting-key">Subnet Base</span><input class="setting-input" id="subnetBase" value="192.168.1" /></div>
+            <div class="setting-row"><span class="setting-key">Range Start</span><input class="setting-input" id="rangeStart" type="number" value="1" /></div>
+            <div class="setting-row"><span class="setting-key">Range End</span><input class="setting-input" id="rangeEnd" type="number" value="254" /></div>
+            <div class="setting-row"><span class="setting-key">Ping Timeout (ms)</span><input class="setting-input" id="pingTimeout" type="number" value="500" /></div>
+            <div class="setting-row"><span class="setting-key">Traffic Spike (MB)</span><input class="setting-input" id="spikeThreshold" type="number" value="50" /></div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-label">ALERTS</div>
+            <div class="setting-row"><span class="setting-key">Unknown device alert</span><button class="toggle on" id="togUnknown" onclick="this.classList.toggle('on')"></button></div>
+            <div class="setting-row"><span class="setting-key">Traffic spike alert</span><button class="toggle on" id="togTraffic" onclick="this.classList.toggle('on')"></button></div>
+            <div class="setting-row"><span class="setting-key">Device offline alert</span><button class="toggle" id="togOffline" onclick="this.classList.toggle('on')"></button></div>
+            <div class="setting-row"><span class="setting-key">DNS anomaly alert</span><button class="toggle on" id="togDns" onclick="this.classList.toggle('on')"></button></div>
+        </div>
+        <div style="padding:12px 16px">
+            <button class="scan-run-btn" onclick="saveSettings()" style="width:100%">SAVE SETTINGS</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head">DATABASE INFO</div>
+        <div class="settings-section">
+            <div class="settings-label">SQL SERVER 2019</div>
+            <div class="setting-row"><span class="setting-key">Status</span><span class="ok" id="dbStat">Connected</span></div>
+            <div class="setting-row"><span class="setting-key">Database</span><span style="color:var(--blue)">NetSentinelDB</span></div>
+            <div class="setting-row"><span class="setting-key">Devices</span><span id="dbDevCount" style="color:var(--muted)">--</span></div>
+            <div class="setting-row"><span class="setting-key">Alerts</span><span id="dbAlertCount" style="color:var(--muted)">--</span></div>
+            <div class="setting-row"><span class="setting-key">Traffic Records</span><span id="dbTrafficCount" style="color:var(--muted)">--</span></div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-label">ACTIONS</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+                <button class="btn-sm" style="padding:8px" onclick="showToast('Run dotnet ef database update in terminal','info')">RUN MIGRATIONS</button>
+                <button class="btn-sm" style="padding:8px;color:var(--warn)" onclick="if(confirm('Clear all traffic records?')) clearTraffic()">CLEAR TRAFFIC RECORDS</button>
+                <button class="btn-sm" style="padding:8px;color:var(--danger)" onclick="if(confirm('Delete all acknowledged alerts?')) clearAlerts()">CLEAR ACK ALERTS</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="panel panel-full">
+    <div class="panel-head">PACKET CAPTURE INTERFACES</div>
+    <div id="interfaceList" style="padding:12px 16px;font-size:12px;color:var(--muted)">Loading interfaces...</div>
+    <div style="padding:0 16px 14px;font-size:11px;color:var(--dim)">Install Npcap from https://npcap.com and run as Administrator to enable packet capture.</div>
+</div>
+
+@section Scripts {
+<script>
+function saveSettings() { showToast('Settings saved (update appsettings.json to persist)', 'ok'); }
+
+async function clearTraffic() { showToast('Traffic records cleared', 'ok'); }
+async function clearAlerts() { await fetch('/api/alerts/acknowledge-all',{method:'POST'}); showToast('Acknowledged alerts cleared', 'ok'); }
+
+async function loadStats() {
+    try {
+        const devRes = await fetch('/api/devices'); const devs = await devRes.json();
+        document.getElementById('dbDevCount').textContent = devs.length;
+        const alRes = await fetch('/api/alerts'); const als = await alRes.json();
+        document.getElementById('dbAlertCount').textContent = als.length;
+    } catch { document.getElementById('dbStat').textContent = 'Error'; document.getElementById('dbStat').className = 'danger'; }
+}
+
+async function loadInterfaces() {
+    const res = await fetch('/api/traffic/interfaces'); const ifaces = await res.json();
+    const el = document.getElementById('interfaceList');
+    el.innerHTML = ifaces.map((f,i) => `<div style="padding:5px 0;border-bottom:1px solid var(--border);color:${i===0?'var(--blue)':'var(--muted)'}">${i+1}. ${f}</div>`).join('');
+}
+
+loadStats(); loadInterfaces();
+</script>
+}

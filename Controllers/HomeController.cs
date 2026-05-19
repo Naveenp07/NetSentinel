@@ -24,9 +24,11 @@ namespace NetSentinel.Controllers
         }
 
         public async Task<IActionResult> Logs() =>
-            View(await _db.LogEntries.OrderByDescending(l => l.Timestamp).Take(200).ToListAsync());
+            View(await _db.LogEntries.OrderByDescending(l => l.Timestamp).Take(500).ToListAsync());
 
-        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult Reports() => View();
+
+        [ResponseCache(Duration=0, Location=ResponseCacheLocation.None, NoStore=true)]
         public IActionResult Error() => View();
     }
 }

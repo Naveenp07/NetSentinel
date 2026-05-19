@@ -1,0 +1,98 @@
+@{ ViewData["Title"] = "Alerts"; Layout = "~/Views/Shared/_Layout.cshtml"; }
+
+<div class="stat-row" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat-card card-danger">
+        <div class="stat-label">CRITICAL</div>
+        <div class="stat-val danger" id="critCount">--</div>
+        <div class="stat-sub">unacknowledged</div>
+    </div>
+    <div class="stat-card card-warn">
+        <div class="stat-label">WARNINGS</div>
+        <div class="stat-val warn" id="warnCount">--</div>
+        <div class="stat-sub">unacknowledged</div>
+    </div>
+    <div class="stat-card card-green">
+        <div class="stat-label">ACKNOWLEDGED</div>
+        <div class="stat-val ok" id="ackCount">--</div>
+        <div class="stat-sub">resolved</div>
+    </div>
+</div>
+
+<div class="panel panel-full">
+    <div class="panel-head">
+        ALL ALERTS
+        <div class="panel-actions">
+            <button class="btn-sm active" onclick="setFilter('active')" id="fActive">ACTIVE</button>
+            <button class="btn-sm" onclick="setFilter('all')" id="fAll">ALL</button>
+            <button class="btn-sm" onclick="acknowledgeAll()" style="color:var(--green)">ACK ALL</button>
+        </div>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>SEVERITY</th>
+                <th>TYPE</th>
+                <th>MESSAGE</th>
+                <th>SOURCE IP</th>
+                <th>TIME</th>
+                <th>ACTION</th>
+            </tr>
+        </thead>
+        <tbody id="alertTbody">
+            <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--dim)">Loading...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+@section Scripts {
+<script>
+let showAll = false;
+
+function setFilter(f) {
+    showAll = (f === 'all');
+    ['Active','All'].forEach(x => document.getElementById('f'+x)?.classList.remove('active'));
+    document.getElementById('f'+f.charAt(0).toUpperCase()+f.slice(1))?.classList.add('active');
+    loadAlerts();
+}
+
+async function loadAlerts() {
+    const url = showAll ? '/api/alerts' : '/api/alerts?unacknowledgedOnly=true';
+    const res = await fetch(url);
+    const alerts = await res.json();
+
+    const crit = alerts.filter(a => a.severity === 'Critical' && !a.isAcknowledged).length;
+    const warn = alerts.filter(a => a.severity === 'Warning' && !a.isAcknowledged).length;
+    const acked = alerts.filter(a => a.isAcknowledged).length;
+    document.getElementById('critCount').textContent = crit;
+    document.getElementById('warnCount').textContent = warn;
+    document.getElementById('ackCount').textContent = acked;
+
+    const tbody = document.getElementById('alertTbody');
+    if (!alerts.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--green)">✔ No alerts</td></tr>'; return; }
+    tbody.innerHTML = alerts.map(a => {
+        const sevClass = a.severity==='Critical' ? 'danger' : a.severity==='Warning' ? 'warn' : 'info';
+        return `<tr style="${a.isAcknowledged?'opacity:0.45':''}">
+            <td><span class="badge badge-${sevClass==='danger'?'danger':sevClass==='warn'?'warn':'info'}">${a.severity.toUpperCase()}</span></td>
+            <td style="color:var(--muted);font-size:11px">${a.type}</td>
+            <td style="color:#c0d8f0">${a.message}</td>
+            <td style="font-family:var(--mono);color:var(--blue)">${a.sourceIp||'—'}</td>
+            <td style="color:var(--dim)">${new Date(a.timestamp).toLocaleString()}</td>
+            <td>${!a.isAcknowledged ? `<button class="alert-ack-btn" onclick="ackAlert(${a.id})">ACKNOWLEDGE</button>` : '<span style="color:var(--green);font-size:10px">✔ ACK</span>'}</td>
+        </tr>`;
+    }).join('');
+}
+
+async function ackAlert(id) {
+    await fetch(`/api/alerts/${id}/acknowledge`, {method:'POST'});
+    loadAlerts(); updateAlertBadge(); showToast('Alert acknowledged','ok');
+}
+
+async function acknowledgeAll() {
+    await fetch('/api/alerts/acknowledge-all', {method:'POST'});
+    loadAlerts(); updateAlertBadge(); showToast('All alerts acknowledged','ok');
+}
+
+loadAlerts();
+setInterval(loadAlerts, 10000);
+</script>
+}

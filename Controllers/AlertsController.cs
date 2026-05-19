@@ -5,20 +5,27 @@ using NetSentinel.Services;
 
 namespace NetSentinel.Controllers
 {
+    public class AlertsController : Controller
+    {
+        private readonly AppDbContext _db;
+        public AlertsController(AppDbContext db) { _db = db; }
+        public IActionResult Index() => View();
+    }
+
     [ApiController]
-    [Route("api/[controller]")]
-    public class AlertsController : ControllerBase
+    [Route("api/alerts")]
+    public class AlertsApiController : ControllerBase
     {
         private readonly AppDbContext _db;
         private readonly AlertService _svc;
-        public AlertsController(AppDbContext db, AlertService svc) { _db = db; _svc = svc; }
+        public AlertsApiController(AppDbContext db, AlertService svc) { _db = db; _svc = svc; }
 
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] bool unacknowledgedOnly = false)
         {
             var q = _db.Alerts.AsQueryable();
             if (unacknowledgedOnly) q = q.Where(a => !a.IsAcknowledged);
-            return Ok(await q.OrderByDescending(a => a.Timestamp).Take(100).ToListAsync());
+            return Ok(await q.OrderByDescending(a => a.Timestamp).Take(200).ToListAsync());
         }
 
         [HttpGet("count")]
@@ -26,7 +33,8 @@ namespace NetSentinel.Controllers
             Ok(new { UnacknowledgedCount = await _db.Alerts.CountAsync(a => !a.IsAcknowledged) });
 
         [HttpPost("{id}/acknowledge")]
-        public async Task<IActionResult> Ack(int id) => await _svc.AcknowledgeAsync(id) ? Ok() : NotFound();
+        public async Task<IActionResult> Ack(int id) =>
+            await _svc.AcknowledgeAsync(id) ? Ok() : NotFound();
 
         [HttpPost("acknowledge-all")]
         public async Task<IActionResult> AckAll()

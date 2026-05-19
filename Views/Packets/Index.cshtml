@@ -1,0 +1,44 @@
+@{ ViewData["Title"] = "Packets"; Layout = "~/Views/Shared/_Layout.cshtml"; }
+<div class="panel panel-full">
+    <div class="panel-head">PACKET HISTORY
+        <div class="panel-actions">
+            <button class="btn-sm active" onclick="setProto('all')" id="pAll">ALL</button>
+            <button class="btn-sm" onclick="setProto('HTTP')" id="pHTTP">HTTP</button>
+            <button class="btn-sm" onclick="setProto('DNS')" id="pDNS">DNS</button>
+            <button class="btn-sm" onclick="setProto('TCP')" id="pTCP">TCP</button>
+        </div>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>TIME</th><th>PROTOCOL</th><th>SOURCE</th><th>DESTINATION</th><th>BYTES</th><th>DETAILS</th></tr></thead>
+        <tbody id="packetTbody"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--dim)">Loading packet history...</td></tr></tbody>
+    </table>
+</div>
+@section Scripts {
+<script>
+let protoFilter = 'all';
+function setProto(p) {
+    protoFilter = p;
+    ['all','HTTP','DNS','TCP'].forEach(x => document.getElementById('p'+x)?.classList.remove('active'));
+    document.getElementById('p'+p)?.classList.add('active');
+    loadPackets();
+}
+async function loadPackets() {
+    const url = protoFilter === 'all' ? '/api/traffic/history?minutes=60' : `/api/traffic/history?minutes=60`;
+    const r = await fetch(url); const pkts = await r.json();
+    const filtered = protoFilter === 'all' ? pkts : pkts.filter(p=>p.protocol===protoFilter);
+    const tbody = document.getElementById('packetTbody');
+    if (!filtered.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--dim)">No packets. Start capture in Traffic page.</td></tr>'; return; }
+    tbody.innerHTML = filtered.slice(0,100).map(p=>`
+        <tr>
+            <td style="color:var(--dim)">${new Date(p.timestamp).toLocaleTimeString()}</td>
+            <td><span class="badge ${p.protocol==='HTTP'?'badge-info':p.protocol==='DNS'?'badge-ok':'badge-warn'}">${p.protocol}</span></td>
+            <td style="font-family:var(--mono);color:var(--blue)">${p.sourceIp}:${p.sourcePort}</td>
+            <td style="font-family:var(--mono);color:var(--muted)">${p.destinationIp}:${p.destinationPort}</td>
+            <td style="color:var(--text)">${p.bytesSent}</td>
+            <td style="color:var(--dim);font-size:10px">${p.details||'—'}</td>
+        </tr>`).join('');
+}
+loadPackets();
+setInterval(loadPackets, 5000);
+</script>
+}

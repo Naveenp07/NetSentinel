@@ -4,30 +4,107 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] — NetSentinel</title>
-    <link rel="stylesheet" href="~/css/site.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 <div class="ns-layout">
-    <aside class="sidebar">
-        <div class="logo">NET<span>SENTINEL</span></div>
-        <div class="subnet-label" id="subnetLabel">SQL Server 2019</div>
-        <div class="status-pill"><div class="pulse"></div><span>MONITORING</span></div>
+    <aside class="sidebar" id="sidebar">
+
+        <!-- LOGO — clicks redirect to home -->
+        <a href="/" class="logo-link">
+            <div class="logo">NET<span>SENTINEL</span></div>
+            <div class="logo-sub">Network Intelligence Platform</div>
+        </a>
+
+        <div class="status-pill">
+            <div class="pulse" id="statusPulse"></div>
+            <span id="statusText">MONITORING</span>
+        </div>
+
+        <div class="subnet-info">
+            <div class="subnet-row"><span class="subnet-label">SUBNET</span><span id="subnetVal">192.168.1.0/24</span></div>
+            <div class="subnet-row"><span class="subnet-label">UPTIME</span><span id="uptimeVal">--</span></div>
+        </div>
+
         <nav>
             <div class="nav-section">MONITOR</div>
-            <a href="/" class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString()=="Index"?"active":"")"><span>◈</span> Dashboard</a>
+            <a href="/" class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString()=="Index" && ViewContext.RouteData.Values["controller"]?.ToString()=="Home" ? "active" : "")">
+                <span class="nav-icon">◈</span> Dashboard
+            </a>
+            <a href="/Devices/Index" class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString()=="Devices" ? "active" : "")">
+                <span class="nav-icon">⬡</span> Devices
+                <span class="nav-badge" id="navDeviceBadge"></span>
+            </a>
+            <a href="/Traffic/Index" class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString()=="Traffic" ? "active" : "")">
+                <span class="nav-icon">≋</span> Traffic
+            </a>
+            <a href="/PortScanner/Index" class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString()=="PortScanner" ? "active" : "")">
+                <span class="nav-icon">⊹</span> Port Scanner
+            </a>
+
             <div class="nav-section">SECURITY</div>
-            <a href="#" class="nav-item"><span>⚠</span> Alerts <span class="alert-badge" id="alertBadge" style="display:none">0</span></a>
+            <a href="/Alerts/Index" class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString()=="Alerts" ? "active" : "")">
+                <span class="nav-icon">⚠</span> Alerts
+                <span class="alert-badge" id="alertNavBadge" style="display:none">0</span>
+            </a>
+            <a href="/Packets/Index" class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString()=="Packets" ? "active" : "")">
+                <span class="nav-icon">◎</span> Packets
+            </a>
+            <a href="/Whitelist/Index" class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString()=="Whitelist" ? "active" : "")">
+                <span class="nav-icon">✦</span> Whitelist
+            </a>
+
             <div class="nav-section">DATA</div>
-            <a href="/Home/Logs" class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString()=="Logs"?"active":"")"><span>☰</span> Logs</a>
+            <a href="/Home/Logs" class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString()=="Logs" ? "active" : "")">
+                <span class="nav-icon">☰</span> Logs
+            </a>
+            <a href="/Home/Reports" class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString()=="Reports" ? "active" : "")">
+                <span class="nav-icon">◫</span> Reports
+            </a>
+            <a href="/Settings/Index" class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString()=="Settings" ? "active" : "")">
+                <span class="nav-icon">⚙</span> Settings
+            </a>
         </nav>
+
         <button class="scan-btn" id="scanBtn" onclick="triggerScan()">▶ SCAN NETWORK</button>
+
+        <div class="sidebar-footer">
+            <div class="sf-row"><span class="sf-label">DB</span><span class="sf-val ok">SQL Server 2019</span></div>
+            <div class="sf-row"><span class="sf-label">CAPTURE</span><span class="sf-val" id="captureStatus">IDLE</span></div>
+        </div>
     </aside>
-    <main class="main-content">@RenderBody()</main>
+
+    <main class="main-content">
+        <div class="topbar">
+            <button class="hamburger" onclick="toggleSidebar()">☰</button>
+            <div class="breadcrumb">@ViewData["Title"]</div>
+            <div class="topbar-right">
+                <span class="topbar-time" id="topbarTime"></span>
+                <span class="topbar-badge danger-badge" id="topbarAlerts" onclick="window.location='/Alerts/Index'" style="display:none">
+                    ⚠ <span id="topbarAlertCount">0</span> alerts
+                </span>
+            </div>
+        </div>
+        <div class="page-content">
+            @RenderBody()
+        </div>
+    </main>
 </div>
+
 <div id="toastContainer" class="toast-container"></div>
+
+<!-- Scan progress modal -->
+<div id="scanModal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+        <div class="modal-title">◈ SCANNING NETWORK</div>
+        <div class="scan-progress-track"><div class="scan-progress-bar" id="scanBar"></div></div>
+        <div class="scan-status" id="scanStatus">Initializing ping sweep...</div>
+    </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
-<script src="~/js/site.js"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

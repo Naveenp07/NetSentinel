@@ -9,6 +9,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
 
+// ✅ Swagger (API Documentation + Testing)
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 // SQL Server 2019
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
@@ -34,6 +38,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
     try
     {
         db.Database.Migrate();
@@ -48,9 +53,17 @@ using (var scope = app.Services.CreateScope())
 if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
 
+// ✅ Swagger middleware (IMPORTANT: must be before routing/static files)
+app.UseSwagger();
+app.UseSwaggerUI();
+
 app.UseStaticFiles();
 app.UseRouting();
-app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}");
+
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
+
 app.MapHub<NetworkHub>("/networkHub");
 
 app.Run();

@@ -1,35 +1,36 @@
-@model List<NetSentinel.Models.LogEntry>
-@{
-    ViewData["Title"] = "Logs";
-    Layout = "~/Views/Shared/_Layout.cshtml";
+@{ ViewData["Title"] = "Logs"; Layout = "~/Views/Shared/_Layout.cshtml"; }
+<div class="panel panel-full">
+    <div class="panel-head">SYSTEM LOGS
+        <div class="panel-actions">
+            <button class="btn-sm active" onclick="setLevel('all')" id="lAll">ALL</button>
+            <button class="btn-sm" onclick="setLevel('OK')" id="lOK">OK</button>
+            <button class="btn-sm" onclick="setLevel('INFO')" id="lINFO">INFO</button>
+            <button class="btn-sm" onclick="setLevel('WARN')" id="lWARN">WARN</button>
+            <button class="btn-sm" onclick="setLevel('ERROR')" id="lERROR">ERROR</button>
+        </div>
+    </div>
+    <div id="logTable" class="log-table" style="max-height:75vh"></div>
+</div>
+@section Scripts {
+<script>
+let levelFilter = 'all';
+let allLogs = [];
+function setLevel(l) {
+    levelFilter = l;
+    ['all','OK','INFO','WARN','ERROR'].forEach(x => document.getElementById('l'+x)?.classList.remove('active'));
+    document.getElementById('l'+l)?.classList.add('active');
+    renderLogs();
 }
-
-<div class="page-header">
-    <div class="page-title">SYSTEM LOGS</div>
-    <div class="last-scan">@Model.Count entries</div>
-</div>
-
-<div class="panel" style="margin-bottom:0">
-    <div class="panel-head">
-        LOG HISTORY
-        <span class="badge badge-info">Last 200 entries</span>
-    </div>
-    <div class="log-table">
-        @if (!Model.Any())
-        {
-            <div class="empty-state">No log entries yet. Run a scan to generate logs.</div>
-        }
-        else
-        {
-            @foreach (var log in Model)
-            {
-                <div class="log-row">
-                    <span class="log-time">@log.Timestamp.ToString("HH:mm:ss")</span>
-                    <span class="log-level log-@log.Level.ToLower()">[@log.Level]</span>
-                    <span class="log-source">@log.Source</span>
-                    <span class="log-msg log-@log.Level.ToLower()">@log.Message</span>
-                </div>
-            }
-        }
-    </div>
-</div>
+function renderLogs() {
+    const logs = levelFilter === 'all' ? allLogs : allLogs.filter(l=>l.level===levelFilter);
+    document.getElementById('logTable').innerHTML = logs.length
+        ? logs.map(l=>`<div class="log-row"><span class="log-time">${new Date(l.timestamp).toLocaleTimeString()}</span><span class="log-level log-${l.level.toLowerCase()}">[${l.level}]</span><span class="log-source">${l.source||''}</span><span class="log-msg log-${l.level.toLowerCase()}">${l.message}</span></div>`).join('')
+        : '<div class="empty-state">No log entries for this filter</div>';
+}
+async function loadLogs() {
+    const r = await fetch('/api/logs'); allLogs = await r.json(); renderLogs();
+}
+loadLogs();
+setInterval(loadLogs, 10000);
+</script>
+}

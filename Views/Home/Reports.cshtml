@@ -1,0 +1,41 @@
+@{ ViewData["Title"] = "Reports"; Layout = "~/Views/Shared/_Layout.cshtml"; }
+<div class="panel panel-full">
+    <div class="panel-head">NETWORK REPORT <span class="badge badge-info" id="reportDate"></span></div>
+    <div class="report-stat-row" style="grid-template-columns:repeat(4,1fr)">
+        <div class="report-stat"><div class="report-stat-num info" id="rTotalDevices">--</div><div class="report-stat-label">TOTAL DEVICES</div></div>
+        <div class="report-stat"><div class="report-stat-num ok" id="rOnline">--</div><div class="report-stat-label">ONLINE</div></div>
+        <div class="report-stat"><div class="report-stat-num danger" id="rAlerts">--</div><div class="report-stat-label">TOTAL ALERTS</div></div>
+        <div class="report-stat"><div class="report-stat-num warn" id="rUnknown">--</div><div class="report-stat-label">UNKNOWN DEVICES</div></div>
+    </div>
+</div>
+<div class="panels">
+    <div class="panel">
+        <div class="panel-head">DEVICE HISTORY</div>
+        <div id="deviceReport" class="live-log" style="max-height:400px"></div>
+    </div>
+    <div class="panel">
+        <div class="panel-head">RECENT ALERTS</div>
+        <div id="alertReport" class="live-log" style="max-height:400px"></div>
+    </div>
+</div>
+@section Scripts {
+<script>
+document.getElementById('reportDate').textContent = new Date().toLocaleDateString();
+async function loadReport() {
+    const [devRes, alRes] = await Promise.all([fetch('/api/devices'), fetch('/api/alerts')]);
+    const devs = await devRes.json(); const alerts = await alRes.json();
+    document.getElementById('rTotalDevices').textContent = devs.length;
+    document.getElementById('rOnline').textContent = devs.filter(d=>d.isOnline).length;
+    document.getElementById('rAlerts').textContent = alerts.length;
+    document.getElementById('rUnknown').textContent = devs.filter(d=>!d.isKnown).length;
+    document.getElementById('deviceReport').innerHTML = devs.map(d=>`
+        <div class="log-row"><span class="log-time">${d.isOnline?'<span class="ok">●</span>':'<span class="danger">●</span>'}</span>
+        <span class="log-msg log-info">${d.ipAddress}</span>
+        <span class="log-msg muted">${d.macAddress}</span></div>`).join('');
+    document.getElementById('alertReport').innerHTML = alerts.slice(0,20).map(a=>`
+        <div class="log-row"><span class="log-time" style="width:80px">${new Date(a.timestamp).toLocaleTimeString()}</span>
+        <span class="log-msg ${a.severity==='Critical'?'log-danger':'log-warn'}">[${a.severity.toUpperCase()}] ${a.message}</span></div>`).join('');
+}
+loadReport();
+</script>
+}

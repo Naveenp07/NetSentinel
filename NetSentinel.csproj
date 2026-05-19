@@ -18,5 +18,6 @@
     </PackageReference>
     <PackageReference Include="SharpPcap" Version="6.2.5" />
     <PackageReference Include="PacketDotNet" Version="1.4.7" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
   </ItemGroup>
 </Project>

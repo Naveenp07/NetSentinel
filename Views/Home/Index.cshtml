@@ -1,52 +1,138 @@
 @model NetSentinel.Models.DashboardStats
 @{ ViewData["Title"] = "Dashboard"; Layout = "~/Views/Shared/_Layout.cshtml"; }
 
-<div class="page-header">
-    <div class="page-title">DASHBOARD</div>
-    <div class="last-scan">Last scan: <span id="lastScan">@(Model.LastScan == DateTime.MinValue ? "Never" : Model.LastScan.ToString("HH:mm:ss"))</span></div>
-</div>
-
 <div class="stat-row">
-    <div class="stat-card"><div class="stat-label">DEVICES</div><div class="stat-val" id="totalDevices">@Model.TotalDevices</div><div class="stat-sub">total tracked</div></div>
-    <div class="stat-card"><div class="stat-label">ONLINE</div><div class="stat-val ok" id="onlineDevices">@Model.OnlineDevices</div><div class="stat-sub muted">@Model.OfflineDevices offline</div></div>
-    <div class="stat-card"><div class="stat-label">ALERTS</div><div class="stat-val danger" id="alertCount">@Model.ActiveAlerts</div><div class="stat-sub warn">unacknowledged</div></div>
-    <div class="stat-card"><div class="stat-label">TRAFFIC</div><div class="stat-val info" id="trafficStat">--</div><div class="stat-sub muted" id="trafficSub">MB/s</div></div>
+    <div class="stat-card card-blue">
+        <div class="stat-label">TOTAL DEVICES</div>
+        <div class="stat-val" id="totalDevices">@Model.TotalDevices</div>
+        <div class="stat-trend trend-neutral" id="devTrend">tracked on network</div>
+    </div>
+    <div class="stat-card card-green">
+        <div class="stat-label">ONLINE NOW</div>
+        <div class="stat-val ok" id="onlineDevices">@Model.OnlineDevices</div>
+        <div class="stat-trend muted">@Model.OfflineDevices offline</div>
+    </div>
+    <div class="stat-card card-danger">
+        <div class="stat-label">ACTIVE ALERTS</div>
+        <div class="stat-val danger" id="alertCount">@Model.ActiveAlerts</div>
+        <div class="stat-trend warn" id="alertSub">unacknowledged</div>
+    </div>
+    <div class="stat-card card-warn">
+        <div class="stat-label">TRAFFIC (MB/s)</div>
+        <div class="stat-val info" id="trafficStat">--</div>
+        <div class="stat-trend" id="trafficSub" style="color:var(--muted)">no capture active</div>
+    </div>
 </div>
 
 <div class="panels">
+    <!-- Devices panel -->
     <div class="panel">
-        <div class="panel-head">DEVICES <span class="badge badge-info" id="devBadge">@Model.TotalDevices found</span></div>
+        <div class="panel-head">
+            DEVICES
+            <div class="panel-actions">
+                <span class="badge badge-info" id="devBadge">@Model.TotalDevices found</span>
+                <a href="/Devices/Index"><button class="btn-sm">VIEW ALL</button></a>
+            </div>
+        </div>
         <div id="deviceList"><div class="empty-state">Run a scan to discover devices</div></div>
     </div>
+
+    <!-- Alerts panel -->
     <div class="panel">
-        <div class="panel-head">ALERTS <span class="badge badge-warn" id="alertBadgePanel">@Model.ActiveAlerts active</span></div>
+        <div class="panel-head">
+            ALERTS
+            <div class="panel-actions">
+                <span class="badge badge-danger" id="alertBadgePanel">@Model.ActiveAlerts active</span>
+                <button class="btn-sm" onclick="acknowledgeAll()">ACK ALL</button>
+                <a href="/Alerts/Index"><button class="btn-sm">VIEW ALL</button></a>
+            </div>
+        </div>
         <div id="alertList"><div class="empty-state">No active alerts</div></div>
     </div>
 </div>
 
 <div class="panels">
+    <!-- Traffic panel -->
     <div class="panel">
-        <div class="panel-head">LIVE TRAFFIC</div>
+        <div class="panel-head">
+            LIVE TRAFFIC
+            <div class="panel-actions">
+                <button class="btn-sm" id="captureToggle" onclick="toggleCapture()">START CAPTURE</button>
+            </div>
+        </div>
         <div class="traffic-bars">
-            <div class="bar-group"><div class="bar-label"><span>HTTP</span><span id="httpMb">-- MB/s</span></div><div class="bar-track"><div class="bar-fill bar-blue" id="httpBar" style="width:0%"></div></div></div>
-            <div class="bar-group"><div class="bar-label"><span>DNS</span><span id="dnsMb">-- MB/s</span></div><div class="bar-track"><div class="bar-fill bar-green" id="dnsBar" style="width:0%"></div></div></div>
-            <div class="bar-group"><div class="bar-label"><span>OTHER</span><span id="otherMb">-- MB/s</span></div><div class="bar-track"><div class="bar-fill bar-orange" id="otherBar" style="width:0%"></div></div></div>
+            <div class="bar-group">
+                <div class="bar-label"><span>HTTP / HTTPS</span><span id="httpMb">-- MB/s</span></div>
+                <div class="bar-track"><div class="bar-fill bar-blue" id="httpBar" style="width:0%"></div></div>
+            </div>
+            <div class="bar-group">
+                <div class="bar-label"><span>DNS</span><span id="dnsMb">-- MB/s</span></div>
+                <div class="bar-track"><div class="bar-fill bar-green" id="dnsBar" style="width:0%"></div></div>
+            </div>
+            <div class="bar-group">
+                <div class="bar-label"><span>OTHER IP</span><span id="otherMb">-- MB/s</span></div>
+                <div class="bar-track"><div class="bar-fill bar-orange" id="otherBar" style="width:0%"></div></div>
+            </div>
         </div>
         <div class="wave-container" id="wave"></div>
     </div>
+
+    <!-- Live logs panel -->
     <div class="panel">
-        <div class="panel-head">LIVE LOGS</div>
+        <div class="panel-head">
+            LIVE LOGS
+            <div class="panel-actions">
+                <a href="/Home/Logs"><button class="btn-sm">FULL LOG</button></a>
+            </div>
+        </div>
         <div id="liveLog" class="live-log"></div>
+    </div>
+</div>
+
+<!-- Quick stats row -->
+<div class="panels">
+    <div class="panel">
+        <div class="panel-head">NETWORK OVERVIEW</div>
+        <div class="report-stat-row">
+            <div class="report-stat">
+                <div class="report-stat-num ok" id="knownCount">--</div>
+                <div class="report-stat-label">TRUSTED DEVICES</div>
+            </div>
+            <div class="report-stat">
+                <div class="report-stat-num danger" id="unknownCount">--</div>
+                <div class="report-stat-label">UNKNOWN DEVICES</div>
+            </div>
+            <div class="report-stat">
+                <div class="report-stat-num info" id="scanCount">--</div>
+                <div class="report-stat-label">TOTAL SCANS</div>
+            </div>
+        </div>
+    </div>
+    <div class="panel">
+        <div class="panel-head">QUICK ACTIONS</div>
+        <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+            <button class="btn-sm" style="width:100%;padding:9px;font-size:11px;letter-spacing:1px" onclick="triggerScan()">▶ SCAN NETWORK NOW</button>
+            <a href="/PortScanner/Index"><button class="btn-sm" style="width:100%;padding:9px;font-size:11px;letter-spacing:1px">⊹ OPEN PORT SCANNER</button></a>
+            <a href="/Whitelist/Index"><button class="btn-sm" style="width:100%;padding:9px;font-size:11px;letter-spacing:1px">✦ MANAGE WHITELIST</button></a>
+            <a href="/Home/Reports"><button class="btn-sm" style="width:100%;padding:9px;font-size:11px;letter-spacing:1px">◫ VIEW REPORTS</button></a>
+        </div>
     </div>
 </div>
 
 @section Scripts {
 <script>
+// ---- Device list ----
 async function loadDevices() {
-    const r = await fetch('/api/devices'); const devs = await r.json();
+    const res = await fetch('/api/devices');
+    const devs = await res.json();
     const el = document.getElementById('deviceList');
+    document.getElementById('totalDevices').textContent = devs.length;
+    document.getElementById('onlineDevices').textContent = devs.filter(d=>d.isOnline).length;
+    document.getElementById('devBadge').textContent = devs.length+' found';
+    document.getElementById('knownCount').textContent = devs.filter(d=>d.isKnown).length;
+    document.getElementById('unknownCount').textContent = devs.filter(d=>!d.isKnown && d.isOnline).length;
     if (!devs.length) { el.innerHTML='<div class="empty-state">No devices. Run a scan.</div>'; return; }
-    el.innerHTML = devs.slice(0,8).map(d=>`
+    el.innerHTML = devs.slice(0,6).map(d=>`
         <div class="device-row">
             <div class="dot ${d.isOnline?'dot-green':'dot-red'}"></div>
             <div class="dev-info">
@@ -55,32 +141,59 @@ async function loadDevices() {
             </div>
             <div class="dev-mac">${d.macAddress}</div>
         </div>`).join('');
-    document.getElementById('totalDevices').textContent = devs.length;
-    document.getElementById('onlineDevices').textContent = devs.filter(d=>d.isOnline).length;
-    document.getElementById('devBadge').textContent = devs.length+' found';
 }
+
+// ---- Alerts ----
 async function loadAlerts() {
-    const r = await fetch('/api/alerts?unacknowledgedOnly=true'); const alerts = await r.json();
+    const res = await fetch('/api/alerts?unacknowledgedOnly=true');
+    const alerts = await res.json();
     document.getElementById('alertCount').textContent = alerts.length;
     document.getElementById('alertBadgePanel').textContent = alerts.length+' active';
-    const b = document.getElementById('alertBadge');
-    b.style.display = alerts.length?'inline':'none'; b.textContent = alerts.length;
     const el = document.getElementById('alertList');
-    if (!alerts.length) { el.innerHTML='<div class="empty-state">No active alerts</div>'; return; }
+    if (!alerts.length) { el.innerHTML='<div class="empty-state">No active alerts ✔</div>'; return; }
     el.innerHTML = alerts.slice(0,5).map(a=>`
         <div class="alert-row">
-            <div class="alert-icon ${a.severity===2?'alert-danger-bg':'alert-warn-bg'}">${a.severity===2?'!':'↑'}</div>
-            <div class="alert-text"><strong>${a.type}</strong><br>${a.message}</div>
+            <div class="alert-icon ${a.severity==='Critical'?'alert-danger-bg':'alert-warn-bg'}">${a.severity==='Critical'?'!':'↑'}</div>
+            <div class="alert-text"><strong>${a.type}</strong>${a.message}</div>
             <div class="alert-time">${new Date(a.timestamp).toLocaleTimeString()}</div>
+            <button class="alert-ack-btn" onclick="ackAlert(${a.id})">ACK</button>
         </div>`).join('');
 }
+
+async function ackAlert(id) {
+    await fetch(`/api/alerts/${id}/acknowledge`, {method:'POST'});
+    loadAlerts(); updateAlertBadge();
+}
+
+async function acknowledgeAll() {
+    await fetch('/api/alerts/acknowledge-all', {method:'POST'});
+    loadAlerts(); updateAlertBadge();
+    showToast('All alerts acknowledged', 'ok');
+}
+
+// ---- Traffic ----
+let isCapturing = false;
+async function toggleCapture() {
+    const btn = document.getElementById('captureToggle');
+    if (!isCapturing) {
+        const r = await fetch('/api/traffic/capture/start', {method:'POST'});
+        if (r.ok) { isCapturing=true; btn.textContent='STOP CAPTURE'; btn.classList.add('active'); showToast('Packet capture started','ok'); }
+        else showToast('Capture failed — run as Administrator','danger');
+    } else {
+        await fetch('/api/traffic/capture/stop', {method:'POST'});
+        isCapturing=false; btn.textContent='START CAPTURE'; btn.classList.remove('active');
+        showToast('Capture stopped','info');
+    }
+}
+
 async function loadTraffic() {
     const r = await fetch('/api/traffic/stats'); const s = await r.json();
     document.getElementById('trafficStat').textContent = s.totalMbps.toFixed(1);
-    document.getElementById('trafficSub').textContent = s.totalMbps > 10 ? '⚠ spike!' : 'MB/s normal';
-    document.getElementById('httpMb').textContent = s.httpMbps.toFixed(2)+' MB/s';
-    document.getElementById('dnsMb').textContent  = s.dnsMbps.toFixed(2)+' MB/s';
-    document.getElementById('otherMb').textContent= s.otherMbps.toFixed(2)+' MB/s';
+    document.getElementById('trafficSub').textContent = s.totalMbps > 10 ? '⚠ spike detected!' : 'normal';
+    document.getElementById('trafficSub').style.color = s.totalMbps > 10 ? 'var(--warn)' : 'var(--muted)';
+    document.getElementById('httpMb').textContent  = s.httpMbps.toFixed(2)+' MB/s';
+    document.getElementById('dnsMb').textContent   = s.dnsMbps.toFixed(2)+' MB/s';
+    document.getElementById('otherMb').textContent = s.otherMbps.toFixed(2)+' MB/s';
     const max = Math.max(s.totalMbps,0.01);
     document.getElementById('httpBar').style.width  = Math.min(100,s.httpMbps/max*100)+'%';
     document.getElementById('dnsBar').style.width   = Math.min(100,s.dnsMbps/max*100)+'%';
@@ -90,17 +203,35 @@ async function loadTraffic() {
         s.waveData.forEach((v,i)=>{ if(cols[i]) cols[i].style.height=Math.min(48,Math.max(4,v/2))+'px'; });
     }
 }
+
+async function loadScanCount() {
+    try { const r = await fetch('/api/scans/count'); const d = await r.json(); document.getElementById('scanCount').textContent = d.count||0; } catch {}
+}
+
+function addLiveLog(msg) {
+    const el = document.getElementById('liveLog');
+    const cls = msg.includes('ALERT')||msg.includes('CRITICAL') ? 'log-danger' : msg.includes('WARN') ? 'log-warn' : msg.includes('OK') ? 'log-ok' : 'log-info';
+    const row = document.createElement('div'); row.className = 'log-row';
+    row.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString('en-GB')}</span><span class="log-msg ${cls}">${msg}</span>`;
+    el.prepend(row);
+    while (el.children.length > 20) el.removeChild(el.lastChild);
+}
+
+async function loadLogs() {
+    const r = await fetch('/api/traffic/logs?count=10'); const logs = await r.json();
+    const el = document.getElementById('liveLog');
+    if (!el.children.length)
+        el.innerHTML = logs.length ? logs.map(l=>`<div class="log-row"><span class="log-time">${new Date().toLocaleTimeString()}</span><span class="log-msg log-info">${l}</span></div>`).join('') : '<div class="empty-state">No packet data. Start capture.</div>';
+}
+
 // Wave init
-const wave = document.getElementById('wave');
-for(let i=0;i<25;i++){const c=document.createElement('div');c.className='wave-col';c.style.height=Math.floor(Math.random()*28+8)+'px';wave.appendChild(c);}
-// SignalR
-const conn = new signalR.HubConnectionBuilder().withUrl('/networkHub').build();
-conn.on('ReceiveAlert', a => { showToast('⚠ '+a.message,'warn'); loadAlerts(); });
-conn.on('ReceiveDeviceList', () => loadDevices());
-conn.start().catch(e => console.warn('SignalR:', e));
+const waveEl = document.getElementById('wave');
+for(let i=0;i<25;i++){const c=document.createElement('div');c.className='wave-col';c.style.height=Math.floor(Math.random()*28+8)+'px';waveEl.appendChild(c);}
+
 // Init
-loadDevices(); loadAlerts();
-setInterval(()=>{loadTraffic();},3000);
-setInterval(loadAlerts,10000);
+loadDevices(); loadAlerts(); loadLogs(); loadScanCount();
+setInterval(loadTraffic, 3000);
+setInterval(loadAlerts, 12000);
+setInterval(loadDevices, 30000);
 </script>
 }

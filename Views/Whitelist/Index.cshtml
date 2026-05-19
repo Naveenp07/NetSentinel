@@ -1,0 +1,38 @@
+@{ ViewData["Title"] = "Whitelist"; Layout = "~/Views/Shared/_Layout.cshtml"; }
+<div class="panel panel-full">
+    <div class="panel-head">TRUSTED DEVICE WHITELIST
+        <button class="btn-sm ok" onclick="trustAllOnline()">TRUST ALL ONLINE</button>
+    </div>
+    <div class="scan-input-row">
+        <input class="scan-input" id="wlMac" placeholder="MAC Address e.g. A4:C3:F0:11:22:33" style="flex:1" />
+        <input class="scan-input" id="wlLabel" placeholder="Label e.g. My Router" style="flex:1" />
+        <button class="scan-run-btn" onclick="addWhitelist()">ADD DEVICE</button>
+    </div>
+    <div id="whitelistBody"></div>
+</div>
+@section Scripts {
+<script>
+async function loadWhitelist() {
+    const res = await fetch('/api/devices'); const devs = await res.json();
+    const trusted = devs.filter(d => d.isKnown);
+    const unknown = devs.filter(d => !d.isKnown && d.isOnline);
+    const el = document.getElementById('whitelistBody');
+    let html = '';
+    if (trusted.length) {
+        html += '<div style="padding:8px 16px;font-size:9px;color:var(--dim);letter-spacing:2px">TRUSTED DEVICES</div>';
+        html += trusted.map(d=>`<div class="whitelist-row"><div class="dot dot-green"></div><span class="wl-mac">${d.macAddress}</span><span class="wl-label">${d.deviceLabel||d.hostname||d.ipAddress}</span><button class="wl-remove" onclick="removeDevice(${d.id})">REMOVE TRUST</button></div>`).join('');
+    }
+    if (unknown.length) {
+        html += '<div style="padding:8px 16px;font-size:9px;color:var(--danger);letter-spacing:2px;margin-top:8px">UNKNOWN DEVICES (ONLINE)</div>';
+        html += unknown.map(d=>`<div class="whitelist-row"><div class="dot dot-warn"></div><span class="wl-mac">${d.macAddress}</span><span class="wl-label" style="color:var(--warn)">${d.ipAddress} — UNTRUSTED</span><button class="dev-btn trust" onclick="trustDevice(${d.id})" style="padding:3px 10px">TRUST</button></div>`).join('');
+    }
+    if (!html) html = '<div class="empty-state">No devices yet. Run a scan first.</div>';
+    el.innerHTML = html;
+}
+async function trustDevice(id) { await fetch(`/api/devices/${id}/trust`,{method:'PUT'}); loadWhitelist(); showToast('Device trusted','ok'); }
+async function removeDevice(id) { if(!confirm('Remove trust?')) return; await fetch(`/api/devices/${id}/trust`,{method:'DELETE'}); loadWhitelist(); showToast('Trust removed','warn'); }
+async function trustAllOnline() { if(!confirm('Trust all currently online devices?')) return; const r=await fetch('/api/devices'); const devs=await r.json(); for(const d of devs.filter(x=>x.isOnline&&!x.isKnown)) await fetch(`/api/devices/${d.id}/trust`,{method:'PUT'}); loadWhitelist(); showToast('All online devices trusted','ok'); }
+function addWhitelist() { showToast('Use the Devices page to trust devices by IP', 'info'); }
+loadWhitelist();
+</script>
+}

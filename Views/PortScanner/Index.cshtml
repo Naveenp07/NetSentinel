@@ -1,0 +1,96 @@
+@{ ViewData["Title"] = "Port Scanner"; Layout = "~/Views/Shared/_Layout.cshtml"; }
+
+<div class="panel panel-full">
+    <div class="panel-head">PORT SCANNER</div>
+    <div class="scan-input-row">
+        <input type="text" class="scan-input" id="targetIp" placeholder="Target IP address e.g. 192.168.1.1" value="@Context.Request.Query["ip"]" />
+        <select class="scan-input" id="portRange" style="width:180px">
+            <option value="common">Common Ports (top 20)</option>
+            <option value="web">Web Ports (80,443,8080,8443)</option>
+            <option value="full">Full Range (1-1024)</option>
+            <option value="custom">Custom</option>
+        </select>
+        <input type="text" class="scan-input" id="customPorts" placeholder="e.g. 22,80,443,3306" style="width:180px;display:none" />
+        <button class="scan-run-btn" onclick="runPortScan()">⊹ SCAN PORTS</button>
+    </div>
+    <div style="padding:10px 16px;font-size:10px;color:var(--dim);letter-spacing:1px" id="scanInfo">Enter a target IP and click SCAN PORTS</div>
+    <div id="portGrid" class="port-grid"></div>
+    <div id="portSummary" style="padding:10px 16px;font-size:11px;color:var(--muted);display:none">
+        Open: <span id="openCount" class="ok">0</span> &nbsp;|&nbsp;
+        Closed: <span id="closedCount" style="color:var(--dim)">0</span> &nbsp;|&nbsp;
+        Filtered: <span id="filteredCount" class="warn">0</span>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+document.getElementById('portRange').onchange = function() {
+    document.getElementById('customPorts').style.display = this.value === 'custom' ? 'block' : 'none';
+};
+
+const COMMON_PORTS = [
+    {port:21,name:'FTP'},{port:22,name:'SSH'},{port:23,name:'Telnet'},{port:25,name:'SMTP'},
+    {port:53,name:'DNS'},{port:80,name:'HTTP'},{port:110,name:'POP3'},{port:143,name:'IMAP'},
+    {port:443,name:'HTTPS'},{port:445,name:'SMB'},{port:3306,name:'MySQL'},{port:3389,name:'RDP'},
+    {port:5432,name:'PostgreSQL'},{port:6379,name:'Redis'},{port:8080,name:'HTTP-Alt'},
+    {port:8443,name:'HTTPS-Alt'},{port:27017,name:'MongoDB'},{port:1433,name:'MSSQL'},
+    {port:5900,name:'VNC'},{port:9200,name:'Elasticsearch'}
+];
+
+const WEB_PORTS = [{port:80,name:'HTTP'},{port:443,name:'HTTPS'},{port:8080,name:'HTTP-Alt'},{port:8443,name:'HTTPS-Alt'}];
+
+async function runPortScan() {
+    const ip = document.getElementById('targetIp').value.trim();
+    if (!ip) { showToast('Enter a target IP address','warn'); return; }
+
+    let ports = [];
+    const range = document.getElementById('portRange').value;
+    if (range === 'common') ports = COMMON_PORTS;
+    else if (range === 'web') ports = WEB_PORTS;
+    else if (range === 'full') ports = Array.from({length:1024},(_,i)=>({port:i+1,name:''}));
+    else {
+        const custom = document.getElementById('customPorts').value;
+        ports = custom.split(',').map(p=>({port:parseInt(p.trim()),name:''})).filter(p=>!isNaN(p.port));
+    }
+
+    document.getElementById('scanInfo').textContent = `Scanning ${ip} — ${ports.length} ports...`;
+    document.getElementById('portGrid').innerHTML = '';
+    document.getElementById('portSummary').style.display = 'none';
+
+    const results = [];
+    for (const p of ports) {
+        try {
+            const res = await fetch(`/api/portscanner/scan?ip=${encodeURIComponent(ip)}&port=${p.port}`, {signal: AbortSignal.timeout(2000)});
+            const data = await res.json();
+            results.push({...p, status: data.status});
+        } catch {
+            results.push({...p, status:'timeout'});
+        }
+        renderPorts(results);
+    }
+
+    const open = results.filter(r=>r.status==='open').length;
+    const closed = results.filter(r=>r.status==='closed'||r.status==='timeout').length;
+    const filtered = results.filter(r=>r.status==='filtered').length;
+    document.getElementById('openCount').textContent = open;
+    document.getElementById('closedCount').textContent = closed;
+    document.getElementById('filteredCount').textContent = filtered;
+    document.getElementById('portSummary').style.display = 'block';
+    document.getElementById('scanInfo').textContent = `Scan complete — ${ip} — ${results.length} ports checked`;
+    if (open > 0) showToast(`Found ${open} open port(s) on ${ip}`, 'warn');
+}
+
+function renderPorts(results) {
+    const grid = document.getElementById('portGrid');
+    grid.innerHTML = results.map(r => `
+        <div class="port-card ${r.status}">
+            <div class="port-num">${r.port}</div>
+            <div class="port-name">${r.name||'unknown'}</div>
+            <div style="font-size:9px;margin-top:4px;letter-spacing:1px;color:${r.status==='open'?'var(--green)':r.status==='filtered'?'var(--warn)':'var(--dim)'}">${r.status.toUpperCase()}</div>
+        </div>`).join('');
+}
+
+// Auto-scan if IP pre-filled from query string
+if (document.getElementById('targetIp').value) runPortScan();
+</script>
+}

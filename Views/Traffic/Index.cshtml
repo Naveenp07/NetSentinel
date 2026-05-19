@@ -1,0 +1,66 @@
+@{ ViewData["Title"] = "Traffic"; Layout = "~/Views/Shared/_Layout.cshtml"; }
+<div class="panels">
+    <div class="stat-card card-blue" style="border-radius:8px;border:1px solid var(--border);padding:14px 16px"><div class="stat-label">HTTP/HTTPS</div><div class="stat-val info" id="tHttp">--</div><div class="stat-sub">MB/s</div></div>
+    <div class="stat-card card-green" style="border-radius:8px;border:1px solid var(--border);padding:14px 16px"><div class="stat-label">DNS</div><div class="stat-val ok" id="tDns">--</div><div class="stat-sub">MB/s</div></div>
+    <div class="stat-card card-warn" style="border-radius:8px;border:1px solid var(--border);padding:14px 16px"><div class="stat-label">OTHER</div><div class="stat-val warn" id="tOther">--</div><div class="stat-sub">MB/s</div></div>
+    <div class="stat-card card-danger" style="border-radius:8px;border:1px solid var(--border);padding:14px 16px"><div class="stat-label">TOTAL</div><div class="stat-val" id="tTotal">--</div><div class="stat-sub">MB/s</div></div>
+</div>
+<div class="panel panel-full">
+    <div class="panel-head">PACKET CAPTURE
+        <div class="panel-actions">
+            <button class="btn-sm" id="capBtn" onclick="toggleCapture()">START CAPTURE</button>
+            <select class="scan-input" id="ifaceSelect" style="width:200px;padding:3px 8px;font-size:10px"></select>
+        </div>
+    </div>
+    <div class="wave-container" id="wave" style="height:80px;padding:0 16px 16px"></div>
+</div>
+<div class="panel panel-full">
+    <div class="panel-head">LIVE PACKET LOG <span class="badge badge-info" id="pktCount">0 packets</span></div>
+    <div id="packetLog" class="log-table" style="max-height:400px"></div>
+</div>
+@section Scripts {
+<script>
+let capturing = false, pktCount = 0;
+const waveEl = document.getElementById('wave');
+for(let i=0;i<40;i++){const c=document.createElement('div');c.className='wave-col';c.style.height=Math.floor(Math.random()*20+5)+'px';waveEl.appendChild(c);}
+
+async function loadInterfaces() {
+    const r = await fetch('/api/traffic/interfaces'); const ifaces = await r.json();
+    const sel = document.getElementById('ifaceSelect');
+    sel.innerHTML = ifaces.map((f,i)=>`<option value="${i}">${f.substring(0,40)}</option>`).join('');
+}
+
+async function toggleCapture() {
+    const btn = document.getElementById('capBtn');
+    const idx = document.getElementById('ifaceSelect').value;
+    if (!capturing) {
+        const r = await fetch(`/api/traffic/capture/start?deviceIndex=${idx}`,{method:'POST'});
+        if (r.ok) { capturing=true; btn.textContent='STOP CAPTURE'; btn.classList.add('active'); showToast('Capture started','ok'); }
+        else showToast('Failed — run as Administrator with Npcap installed','danger');
+    } else {
+        await fetch('/api/traffic/capture/stop',{method:'POST'});
+        capturing=false; btn.textContent='START CAPTURE'; btn.classList.remove('active'); showToast('Capture stopped','info');
+    }
+}
+
+async function pollTraffic() {
+    const r = await fetch('/api/traffic/stats'); const s = await r.json();
+    document.getElementById('tHttp').textContent = s.httpMbps.toFixed(2);
+    document.getElementById('tDns').textContent = s.dnsMbps.toFixed(2);
+    document.getElementById('tOther').textContent = s.otherMbps.toFixed(2);
+    document.getElementById('tTotal').textContent = s.totalMbps.toFixed(2);
+    if (s.waveData) {
+        const cols = waveEl.querySelectorAll('.wave-col');
+        s.waveData.forEach((v,i)=>{ if(cols[i]) cols[i].style.height=Math.min(75,Math.max(4,v))+'px'; });
+    }
+    const lr = await fetch('/api/traffic/logs?count=30'); const logs = await lr.json();
+    document.getElementById('pktCount').textContent = (pktCount+=logs.length)+' packets';
+    const el = document.getElementById('packetLog');
+    if (logs.length) el.innerHTML = logs.map(l=>`<div class="log-row"><span class="log-msg ${l.includes('HTTP')?'log-info':l.includes('DNS')?'log-ok':'log-warn'}">${l}</span></div>`).join('') + el.innerHTML;
+    while (el.children.length > 100) el.removeChild(el.lastChild);
+}
+
+loadInterfaces();
+setInterval(pollTraffic, 2000);
+</script>
+}
